@@ -9,7 +9,7 @@ import com.megacrit.cardcrawl.screens.options.DropdownMenu;
 import com.megacrit.cardcrawl.screens.options.DropdownMenuListener;
 
 public class SaveStateModPanel extends ModPanel implements DropdownMenuListener {
-    private static final int MAX_SAVE_STATES = 5;
+    private static final int MAX_SAVE_STATES = 500;
 
     private static final float LABEL_X_POS = Settings.WIDTH / 5.0F;
     private static final float LABEL_Y_POS = Settings.HEIGHT * 2.0F / 3.0F;

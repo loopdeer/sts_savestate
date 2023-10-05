@@ -1,16 +1,14 @@
 package savestate;
 
 import basemod.BaseMod;
-import basemod.interfaces.OnStartBattleSubscriber;
-import basemod.interfaces.PostInitializeSubscriber;
-import basemod.interfaces.PostUpdateSubscriber;
-import basemod.interfaces.RenderSubscriber;
+import basemod.interfaces.*;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.evacipated.cardcrawl.modthespire.lib.SpireConfig;
 import com.evacipated.cardcrawl.modthespire.lib.SpireInitializer;
 import com.evacipated.cardcrawl.modthespire.lib.SpirePatch;
 import com.evacipated.cardcrawl.modthespire.lib.SpirePostfixPatch;
+import com.megacrit.cardcrawl.actions.GameActionManager;
 import com.megacrit.cardcrawl.cards.AbstractCard;
 import com.megacrit.cardcrawl.characters.AbstractPlayer;
 import com.megacrit.cardcrawl.core.CardCrawlGame;
@@ -27,7 +25,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 
 @SpireInitializer
-public class SaveStateMod implements PostInitializeSubscriber, RenderSubscriber, OnStartBattleSubscriber, PostUpdateSubscriber {
+public class SaveStateMod implements PostInitializeSubscriber, RenderSubscriber, OnStartBattleSubscriber, PostUpdateSubscriber, OnPlayerTurnStartSubscriber {
 
     /**
      * If true, states will be saved and loaded in ways that prioritize speed and function at the
@@ -50,6 +48,8 @@ public class SaveStateMod implements PostInitializeSubscriber, RenderSubscriber,
 
     public static int lastFloorToDisplay = 0;
     public static int curFloorToDisplay = 1;
+
+    public static boolean readyToAutosave = false;
 
     public SaveStateMod() {
         try {
@@ -80,6 +80,12 @@ public class SaveStateMod implements PostInitializeSubscriber, RenderSubscriber,
         for (AbstractCard card : CardLibrary.getAllCards()) {
             cardNameToCardMap.put(prepCardName(card.cardID), card.makeCopy());
         }
+    }
+
+    @Override
+    public void receiveOnPlayerTurnStart() {
+        System.out.println("Test");
+        readyToAutosave = true;
     }
 
     @SpirePatch(clz = PotionHelper.class, method = "initialize")
@@ -123,6 +129,11 @@ public class SaveStateMod implements PostInitializeSubscriber, RenderSubscriber,
     @Override
     public void receivePostUpdate() {
         saveStateController.update();
+        if(AbstractDungeon.actionManager.actions.isEmpty() && !AbstractDungeon.isScreenUp && readyToAutosave){
+            System.out.println("Auto save?");
+            saveStateController.saveInNextEmptySlotOrOldest();
+            readyToAutosave = false;
+        }
 
         if (!isShowingCards()) {
             if (curFloorToDisplay <= lastFloorToDisplay) {
