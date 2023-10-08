@@ -16,6 +16,7 @@ import com.megacrit.cardcrawl.dungeons.AbstractDungeon;
 import com.megacrit.cardcrawl.helpers.CardLibrary;
 import com.megacrit.cardcrawl.helpers.ImageMaster;
 import com.megacrit.cardcrawl.helpers.PotionHelper;
+import com.megacrit.cardcrawl.monsters.AbstractMonster;
 import com.megacrit.cardcrawl.rooms.AbstractRoom;
 import com.megacrit.cardcrawl.vfx.AbstractGameEffect;
 import com.megacrit.cardcrawl.vfx.cardManip.ShowCardBrieflyEffect;
@@ -25,7 +26,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 
 @SpireInitializer
-public class SaveStateMod implements PostInitializeSubscriber, RenderSubscriber, OnStartBattleSubscriber, PostUpdateSubscriber, OnPlayerTurnStartSubscriber {
+public class SaveStateMod implements PostInitializeSubscriber, RenderSubscriber, OnStartBattleSubscriber, PostUpdateSubscriber, OnPlayerTurnStartSubscriber, PreMonsterTurnSubscriber {
 
     /**
      * If true, states will be saved and loaded in ways that prioritize speed and function at the
@@ -88,6 +89,14 @@ public class SaveStateMod implements PostInitializeSubscriber, RenderSubscriber,
         readyToAutosave = true;
     }
 
+    @Override
+    public boolean receivePreMonsterTurn(AbstractMonster abstractMonster) {
+        if (saveStateController.currentLoadedIndex < saveStateController.undoList.size() - 1){
+            saveStateController.undoList.subList(saveStateController.currentLoadedIndex + 1, saveStateController.undoList.size()).clear();
+        }
+        return true;
+    }
+
     @SpirePatch(clz = PotionHelper.class, method = "initialize")
     public static class RemoveUnpalayablePotionsPatch {
         @SpirePostfixPatch
@@ -129,7 +138,7 @@ public class SaveStateMod implements PostInitializeSubscriber, RenderSubscriber,
     @Override
     public void receivePostUpdate() {
         saveStateController.update();
-        if(AbstractDungeon.actionManager.actions.isEmpty() && !AbstractDungeon.isScreenUp && readyToAutosave){
+        if(AbstractDungeon.actionManager.actions.isEmpty() && !AbstractDungeon.isScreenUp && readyToAutosave && AbstractDungeon.handCardSelectScreen.wereCardsRetrieved){
             System.out.println("Auto save?");
             saveStateController.saveInNextEmptySlotOrOldest();
             readyToAutosave = false;

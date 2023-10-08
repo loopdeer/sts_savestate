@@ -1,6 +1,7 @@
 package savestate;
 
 import basemod.ClickableUIElement;
+import basemod.patches.com.megacrit.cardcrawl.saveAndContinue.SaveAndContinue.Save;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
@@ -16,6 +17,8 @@ import com.megacrit.cardcrawl.rooms.AbstractRoom;
 import com.megacrit.cardcrawl.screens.mainMenu.ScrollBarListener;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.LinkedList;
 
 public class SaveStateController {
     private static final String OPTION_KEY = "num_save_states";
@@ -44,6 +47,8 @@ public class SaveStateController {
     private static final float LAST_TURN_X = REDO_BUTTON_X + LAST_TURN_TEXTURE.getWidth() * 1.2f * Settings.scale;
 
     private static final float PANEL_WIDTH = 350F * Settings.scale;
+    public int currentLoadedIndex;
+    public ArrayList<SaveState> undoList;
 
     private SaveState[] savedStates;
     private StatePanel[] statePanels;
@@ -56,11 +61,12 @@ public class SaveStateController {
     public static int numSaveStates = 0;
 
     public static int visible_starting_index = 0;
-    public static int hard_coded_visible_size = 5;
-
+    public static int hard_coded_visible_size = 4;
     public void initialize() {
         savedStates = new SaveState[numSaveStates];
         statePanels = new StatePanel[hard_coded_visible_size];
+        currentLoadedIndex = -1;
+        undoList = new ArrayList<>();
         pages = new PageStatePanel();
         updateStatePanels();
     }
@@ -130,14 +136,8 @@ public class SaveStateController {
     }
 
     public void saveInNextEmptySlotOrOldest(){
-        for (int i = 0; i < savedStates.length; i++){
-            if (savedStates[i] == null){
-                savedStates[i] = new SaveState();
-                lastTurn = currentTurn;
-                currentTurn = savedStates[i];
-                return;
-            }
-        }
+        undoList.add(new SaveState());
+        currentLoadedIndex = undoList.size() - 1;
     }
 
     private static boolean inCombat() {
@@ -244,27 +244,27 @@ public class SaveStateController {
         private final PreviousButton prevButton;
         private final NextButton nextButton;
         private final RedoButton redoButton;
-        private final LastTurnButton lastTurnButton;
+        // private final LastTurnButton lastTurnButton;
 
         public PageStatePanel() {
             this.prevButton = new PreviousButton();
             this.nextButton = new NextButton();
             this.redoButton = new RedoButton();
-            this.lastTurnButton = new LastTurnButton();
+            // this.lastTurnButton = new LastTurnButton();
         }
 
         public void render(SpriteBatch spriteBatch) {
             prevButton.render(spriteBatch);
             nextButton.render(spriteBatch);
             redoButton.render(spriteBatch);
-            lastTurnButton.render(spriteBatch);
+            // lastTurnButton.render(spriteBatch);
         }
 
         public void update() {
             prevButton.update();
             nextButton.update();
             redoButton.update();
-            lastTurnButton.update();
+            // lastTurnButton.update();
         }
         class PreviousButton extends ClickableUIElement{
             public PreviousButton() {
@@ -290,11 +290,13 @@ public class SaveStateController {
 
             @Override
             protected void onClick() {
-                visible_starting_index -= hard_coded_visible_size;
-                if (visible_starting_index < 0) {
-                    visible_starting_index = 0;
+                currentLoadedIndex -= 1;
+                if (currentLoadedIndex >= 0) {
+                    undoList.get(currentLoadedIndex).loadState();
                 }
-                updateStatePanels();
+                else {
+                    currentLoadedIndex = 0;
+                }
             }
         }
         class NextButton extends ClickableUIElement {
@@ -322,11 +324,13 @@ public class SaveStateController {
 
             @Override
             protected void onClick() {
-                visible_starting_index += hard_coded_visible_size;
-                int check = (visible_starting_index / hard_coded_visible_size) * hard_coded_visible_size;
-                if (check >= savedStates.length)
-                    visible_starting_index = (int) (hard_coded_visible_size*((double) Math.abs((savedStates.length - 1) / hard_coded_visible_size)));
-                updateStatePanels();
+                currentLoadedIndex += 1;
+                if (currentLoadedIndex < undoList.size()) {
+                    undoList.get(currentLoadedIndex).loadState();
+                }
+                else {
+                    currentLoadedIndex = undoList.size() - 1;
+                }
             }
         }
         class RedoButton extends ClickableUIElement {
@@ -354,8 +358,7 @@ public class SaveStateController {
 
             @Override
             protected void onClick() {
-                if (currentTurn != null)
-                    currentTurn.loadState();
+                undoList.get(currentLoadedIndex).loadState();
             }
         }
         class LastTurnButton extends ClickableUIElement {
