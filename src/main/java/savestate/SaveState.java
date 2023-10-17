@@ -9,6 +9,8 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.megacrit.cardcrawl.actions.GameActionManager;
 import com.megacrit.cardcrawl.actions.common.DrawCardAction;
+import com.megacrit.cardcrawl.actions.common.EnableEndTurnButtonAction;
+import com.megacrit.cardcrawl.actions.common.GainEnergyAndEnableControlsAction;
 import com.megacrit.cardcrawl.actions.unique.AddCardToDeckAction;
 import com.megacrit.cardcrawl.actions.watcher.LessonLearnedAction;
 import com.megacrit.cardcrawl.cards.AbstractCard;
@@ -21,6 +23,7 @@ import com.megacrit.cardcrawl.monsters.AbstractMonster;
 import com.megacrit.cardcrawl.powers.TheBombPower;
 import com.megacrit.cardcrawl.rooms.EmptyRoom;
 import com.megacrit.cardcrawl.screens.select.GridCardSelectScreen;
+import com.megacrit.cardcrawl.vfx.combat.BattleStartEffect;
 import savestate.selectscreen.CardRewardScreenState;
 import savestate.selectscreen.GridCardSelectScreenState;
 import savestate.selectscreen.HandSelectScreenState;
@@ -79,6 +82,11 @@ public class SaveState {
     private int gridCardSelectAmount = 0;
 
     private final int bombIdOffset;
+
+    //Investigate pre turn effects
+    public boolean autoSaved = false;
+    private boolean playerTurnEnded;
+    public boolean redoStartLogic = false;
 
     public SaveState() {
         if (AbstractDungeon.isScreenUp) {
@@ -168,6 +176,8 @@ public class SaveState {
         }
 
         this.lastCombatMetricKey = AbstractDungeon.lastCombatMetricKey;
+        this.playerTurnEnded = AbstractDungeon.actionManager.turnHasEnded;
+
     }
 
     public SaveState(String jsonString) {
@@ -406,6 +416,30 @@ public class SaveState {
         }
 
         AbstractDungeon.lastCombatMetricKey = this.lastCombatMetricKey;
+        // If save created as part of autosave reapply player turns
+        if (this.autoSaved){
+
+        }
+        AbstractDungeon.actionManager.turnHasEnded = this.playerTurnEnded;
+        if (AbstractDungeon.actionManager.turnHasEnded){
+            if (redoStartLogic){
+                AbstractDungeon.topLevelEffects.add(new BattleStartEffect(false));
+                AbstractDungeon.actionManager.addToBottom(new GainEnergyAndEnableControlsAction(AbstractDungeon.player.energy.energyMaster));
+                AbstractDungeon.player.applyStartOfCombatPreDrawLogic();
+                AbstractDungeon.actionManager.addToBottom(new DrawCardAction(AbstractDungeon.player, AbstractDungeon.player.gameHandSize));
+                AbstractDungeon.actionManager.addToBottom(new EnableEndTurnButtonAction());
+                AbstractDungeon.overlayMenu.showCombatPanels();
+                AbstractDungeon.player.applyStartOfCombatLogic();
+
+                AbstractDungeon.getCurrRoom().skipMonsterTurn = false;
+                AbstractDungeon.player.applyStartOfTurnRelics();
+                AbstractDungeon.player.applyStartOfTurnPostDrawRelics();
+                AbstractDungeon.player.applyStartOfTurnCards();
+                AbstractDungeon.player.applyStartOfTurnPowers();
+                AbstractDungeon.player.applyStartOfTurnOrbs();
+                AbstractDungeon.actionManager.useNextCombatActions();
+            }
+        }
     }
 
     public void loadInitialState() {

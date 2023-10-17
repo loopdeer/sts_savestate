@@ -26,7 +26,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 
 @SpireInitializer
-public class SaveStateMod implements PostInitializeSubscriber, RenderSubscriber, OnStartBattleSubscriber, PostUpdateSubscriber, OnPlayerTurnStartSubscriber, PreMonsterTurnSubscriber {
+public class SaveStateMod implements PostInitializeSubscriber, RenderSubscriber, OnStartBattleSubscriber, PostUpdateSubscriber, OnPlayerTurnStartSubscriber, PreMonsterTurnSubscriber, OnPlayerTurnStartPostDrawSubscriber {
 
     /**
      * If true, states will be saved and loaded in ways that prioritize speed and function at the
@@ -50,7 +50,7 @@ public class SaveStateMod implements PostInitializeSubscriber, RenderSubscriber,
     public static int lastFloorToDisplay = 0;
     public static int curFloorToDisplay = 1;
 
-    public static boolean readyToAutosave = false;
+    public static boolean readyToAutosave;
 
     public SaveStateMod() {
         try {
@@ -86,7 +86,9 @@ public class SaveStateMod implements PostInitializeSubscriber, RenderSubscriber,
     @Override
     public void receiveOnPlayerTurnStart() {
         System.out.println("Test");
-        readyToAutosave = true;
+        if (readyToAutosave) {
+            saveStateController.saveInNextEmptySlotOrOldest();
+        }
     }
 
     @Override
@@ -94,7 +96,16 @@ public class SaveStateMod implements PostInitializeSubscriber, RenderSubscriber,
         if (saveStateController.currentLoadedIndex < saveStateController.undoList.size() - 1){
             saveStateController.undoList.subList(saveStateController.currentLoadedIndex + 1, saveStateController.undoList.size()).clear();
         }
+        readyToAutosave = true;
         return true;
+    }
+
+    @Override
+    public void receiveOnPlayerTurnStartPostDraw() {
+        if (readyToAutosave){
+            saveStateController.undoList.get(saveStateController.currentLoadedIndex).redoStartLogic = GameActionManager.turn == 1;
+            readyToAutosave = false;
+        }
     }
 
     @SpirePatch(clz = PotionHelper.class, method = "initialize")
@@ -126,6 +137,7 @@ public class SaveStateMod implements PostInitializeSubscriber, RenderSubscriber,
     public void receiveOnBattleStart(AbstractRoom abstractRoom) {
         System.err.println("starting battle");
         saveStateController.initialize();
+        readyToAutosave = true;
 
         for (HashMap map : CardCrawlGame.metricData.event_choices) {
             System.err.println(map);
@@ -138,11 +150,11 @@ public class SaveStateMod implements PostInitializeSubscriber, RenderSubscriber,
     @Override
     public void receivePostUpdate() {
         saveStateController.update();
-        if(AbstractDungeon.actionManager.actions.isEmpty() && !AbstractDungeon.isScreenUp && readyToAutosave && AbstractDungeon.handCardSelectScreen.wereCardsRetrieved){
-            System.out.println("Auto save?");
-            saveStateController.saveInNextEmptySlotOrOldest();
-            readyToAutosave = false;
-        }
+//        if(AbstractDungeon.actionManager.actions.isEmpty() && !AbstractDungeon.isScreenUp && readyToAutosave && AbstractDungeon.handCardSelectScreen.wereCardsRetrieved){
+//            System.out.println("Auto save?");
+//            saveStateController.saveInNextEmptySlotOrOldest();
+//            readyToAutosave = false;
+//        }
 
         if (!isShowingCards()) {
             if (curFloorToDisplay <= lastFloorToDisplay) {
